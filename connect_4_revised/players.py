@@ -6,6 +6,7 @@ import sys
 from copy import deepcopy
 import time
 import numpy as np
+import heapq
 
 class connect4Player(object):
 	def __init__(self, position, seed=0, CVDMode=False):
@@ -202,53 +203,36 @@ class alphaBetaAI(connect4Player):
 
 	def __init__(self, position, seed=0, CVDMode=False):
 		super().__init__(position, seed, CVDMode)
-		self.first_move = True  # Hardcode first move to center
-		self.killer_moves = {} 
 		self.weights = np.array([
-			[1,  1,  3,  5,  3, 1, 1],
-			[2,  4,  6,  8,  6, 4, 2],
-			[3,  6,  12, 15, 12, 6, 3],
-			[3,  6,  12, 15, 12, 6, 3],
-			[2,  4,  6,  8,  6, 4, 2],
-			[0,  1,  2,  3,  2, 1, 0],
+			[1,  2,  3,  4,  3, 2, 1],
+            [2,  4,  6,  8,  6, 4, 2],
+            [3,  6,  9, 12,  9, 6, 3],
+            [3,  6,  9, 12,  9, 6, 3],
+            [2,  4,  6,  8,  6, 4, 2],
+            [1,  2,  3,  4,  3, 2, 1]
 		])
 
 	def play(self, env: connect4, move_dict: dict) -> None:
-		start_time = time.time()
-
-		if self.first_move and env.topPosition[3] >= 0:
-			move_dict['move'] = 3
-			self.first_move = False
-			return
-			
-		best_move = 3
-		max_depth = 5
-		time_per_depth = 0.4
-
-		while time.time() - start_time < 2.5:
-			time_remaining = 2.5 - (time.time() - start_time)
-			max_possible_depth = max_depth + int(time_remaining // time_per_depth)
-			for depth in range(max_depth, max_possible_depth + 1):
-				result = self.alpha_beta(env, max_depth, -float('inf'), float('inf'), True, start_time)
-				if result[1] is not None:
-					best_move = result[1]
-					self.killer_moves[max_depth] = best_move
-		
-			max_depth = max_possible_depth + 1
+		best_move = self.alpha_beta_search(env, depth=4)
 		move_dict['move'] = best_move
-	
-	def alpha_beta(self, env: connect4, depth: int, alpha: float, beta: float, maximizing_player: bool, start_time: float):
-		#if time.time() - start_time > 2.9:
-			#return self.evaluate_board(env.board), None
+
+	def alpha_beta_search(self, env, depth):
+		_, best_move = self.alpha_beta(env, depth, -math.inf, math.inf, True)
+		return best_move
 		
-		if np.all(env.topPosition < 0) or depth == 0:
+	def alpha_beta(self, env: connect4, depth: int, alpha: float, beta: float, maximizing_player: bool):
+		
+		if env.gameOver:
+			return -math.inf
+		
+		if depth == 0:
 			return self.evaluate_board(env.board), None
 		
-		possible_moves = self.order_moves(env, depth)
+		possible_moves = self.order_moves(env, maximizing_player)
+		best_move = possible_moves[0] if possible_moves else None
 
 		if maximizing_player:
-			max_eval = -float('inf')
-			best_move = possible_moves[0]
+			max_eval = -math.inf
 			for move in possible_moves:
 				if env.topPosition[move] < 0:
 					continue
@@ -256,13 +240,9 @@ class alphaBetaAI(connect4Player):
 				# Simulate the move
 				new_env = self.simulate_move(env, move, self.position)
 
-				# Check if move is winner
-				new_env.gameOver(move, self.position)
-				if new_env.is_winner:
-					return math.inf, move
-				else:
-					# Recursively call alpha_beta for the opponent
-					eval = self.alpha_beta(new_env, depth - 1, alpha, beta, False, start_time)[0]
+				# Recursively call alpha_beta for the opponent
+				eval, _ = self.alpha_beta(new_env, depth - 1, alpha, beta, False)
+
 
 				# Update the best move
 				if eval > max_eval:
@@ -276,18 +256,14 @@ class alphaBetaAI(connect4Player):
 						break
 			return max_eval, best_move
 		else:
-			min_eval = float('inf')
+			min_eval = math.inf
 			best_move = None
 			for move in possible_moves:
 				# Simulate the move
 				new_env = self.simulate_move(env, move, 3-self.position)
 
-				new_env.gameOver(move, 3-self.position)
-				if new_env.is_winner:
-					eval = -math.inf
-				else:
-					# Recursively call alpha_beta for the player
-					eval = self.alpha_beta(new_env, depth - 1, alpha, beta, True, start_time)[0]
+				# Recursively call alpha_beta for the player
+				eval, _ = self.alpha_beta(new_env, depth - 1, alpha, beta, True)
 
 				# Update the best move
 				if eval < min_eval:
@@ -302,64 +278,54 @@ class alphaBetaAI(connect4Player):
 			return min_eval, best_move
 
 	def evaluate_board(self, board):
-			score = 0
-			# Threat-based scoring (10x higher priority)
-			threat_score += self.evaluate_threats(board) 
-			score += threat_score * 100000
+			# Positional score
+			positional_score = np.sum(board * self.positional_weights)
 			
-			# Positional scoring (secondary)
-			positional_score = 0
-			for r in range(6):
-				for c in range(7):
-					if board[r][c] == self.position:
-						positional_score += self.weights[r][c]
-					elif board[r][c] == (3 - self.position):
-						positional_score -= self.weights[r][c]
-			score += positional_score * 0.1  # Reduce weight impact
-			
-			return score
-
-	def evaluate_threats(self, board):
-		threat_score = 0  # Initialize here
-
-		# Check horizontal windows
-		for r in range(6):
-			for c in range(4):
-				window = list(board[r, c:c+4])
-				threat_score += self.evaluate_window(window)
-		
-		# Check vertical windows
-		for c in range(7):
-			for r in range(3):
-				window = [board[r+i][c] for i in range(4)]
-				threat_score += self.evaluate_window(window)
-		
-		# Check diagonal windows
-		for r in range(3):
-			for c in range(4):
-				window = [board[r+i][c+i] for i in range(4)]
-				threat_score += self.evaluate_window(window)
-				window = [board[r+i][c+3-i] for i in range(4)]
-				threat_score += self.evaluate_window(window)
-		
-		return threat_score
-
-	def order_moves(self, env, depth=0):
-		possible_moves = [col for col in range(7) if env.topPosition[col] >= 0]
-
-		
-		# Prioritize moves that block opponent's 3-in-a-row
-		threat_scores = []
-		for col in possible_moves:
+			# Threat analysis
 			threat_score = 0
-			# Simulate opponent dropping in this column
-			temp_env = self.simulate_move(env, col, 3 - self.position)
-			threat_score = self.evaluate_threats(temp_env.board)
-			threat_scores.append(threat_score)
+			# Horizontal
+			for r in range(6):
+				for c in range(4):
+					window = list(board[r, c:c+4])
+					threat_score += self.evaluate_window(window)
+			# Vertical
+			for c in range(7):
+				for r in range(3):
+					window = [board[r+i][c] for i in range(4)]
+					threat_score += self.evaluate_window(window)
+			# Diagonals
+			for r in range(3):
+				for c in range(4):
+					window = [board[r+i][c+i] for i in range(4)]
+					threat_score += self.evaluate_window(window)
+					window = [board[r+i][c+3-i] for i in range(4)]
+					threat_score += self.evaluate_window(window)
+			
+			return threat_score * 1000 + positional_score
+
+	def order_moves(self, env, maximizing=True):
+		possible_moves = [col for col in range(7) if env.topPosition[col] >= 0]
+		move_scores = []
+
+		for move in possible_moves:
+			temp_env = self.simulate_move(env, move, 
+				self.position if maximizing else 3 - self.position)
+				
+				# Immediate win check
+			if self.is_winning_move(temp_env, move):
+				score = self.win_score if maximizing else self.lose_score
+			# Immediate loss check
+			elif self.is_losing_move(temp_env, move):
+				score = self.lose_score if maximizing else self.win_score
+			else:
+				score = self.evaluate_board(temp_env.board)
+				
+			move_scores.append((score, move))
 		
-		# Order by most dangerous opponent threats first
-		ordered = sorted(zip(possible_moves, threat_scores), key=lambda x: x[1])
-		return [move for move, score in ordered]
+		reverse_sort = maximizing
+		move_scores.sort(reverse=reverse_sort, key=lambda x: x[0])
+		return [move for _, move in move_scores]
+
 
 	def simulate_move(self, env, move, player):
 		new_env = deepcopy(env)
@@ -367,6 +333,16 @@ class alphaBetaAI(connect4Player):
 		new_env.board[row][move] = player
 		new_env.topPosition[move] -= 1
 		return new_env
+	
+	def is_winning_move(self, env, move):
+		temp_env = deepcopy(env)
+		temp_env.gameOver(move, self.position)
+		return temp_env.is_winner
+
+	def is_losing_move(self, env, move):
+		temp_env = deepcopy(env)
+		temp_env.gameOver(move, 3 - self.position)
+		return temp_env.is_winner
 	
 	def evaluate_window(self, window):
 			opponent = 3 - self.position
