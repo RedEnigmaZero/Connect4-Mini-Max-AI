@@ -211,13 +211,11 @@ class alphaBetaAI(connect4Player):
 		if depth == 0:
 			return evaluateFunction(env.board)
 		
-		possible = env.topPosition >= 0
-		indices = []
-		for i, p in enumerate(possible):
-			if p: indices.append(i)
+		possible = vaildMoves(env)
+
 		value = -math.inf
 
-		for move in indices:
+		for move in possible:
 			envCopy = deepcopy(env)
 			self.simulateMove(env, move, self.position)
 			value = max(value, self.MIN(envCopy, depth-1, a, b))
@@ -235,13 +233,11 @@ class alphaBetaAI(connect4Player):
 		if depth == 0:
 			return evaluateFunction(env.board)
 		
-		possible = env.topPosition >= 0
-		indices = []
-		for i, p in enumerate(possible):
-			if p: indices.append(i)
+		possible = vaildMoves(env)
+
 		value = math.inf
 
-		for move in indices:
+		for move in possible:
 			envCopy = deepcopy(env)
 			self.simulateMove(env, move, self.position)
 			value = min(value, self.MAX(envCopy, depth-1, a, b))
@@ -252,6 +248,14 @@ class alphaBetaAI(connect4Player):
 		b = min(b, value)
 
 		return value
+
+	def vaildMoves(self, env):
+		possible = env.topPosition >= 0
+		indices = []
+		for i, p in enumerate(possible):
+			if p: indices.append(i)
+		indices.sort(reverse = True)
+		return indices
 
 
 	def simulateMove(self, env: connect4, move: int, player: int):
