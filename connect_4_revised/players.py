@@ -200,186 +200,78 @@ class alphaBetaAI(connect4Player):
 	implements the minimiax algorithm WITH alpha-beta pruning
 	'''
 
-	def __init__(self, position, seed=0, CVDMode=False):
-		super().__init__(position, seed, CVDMode)
-		self.first_move = True  # Hardcode first move to center
-		self.killer_moves = {} 
-		self.weights = np.array([
-			[1,  1,  3,  5,  3, 1, 1],
-			[2,  4,  6,  8,  6, 4, 2],
-			[3,  6,  12, 15, 12, 6, 3],
-			[3,  6,  12, 15, 12, 6, 3],
-			[2,  4,  6,  8,  6, 4, 2],
-			[0,  1,  2,  3,  2, 1, 0],
-		])
-
 	def play(self, env: connect4, move_dict: dict) -> None:
-		start_time = time.time()
+		maxDepth = 2
+		self.MAX(env, maxDepth)
+		#move[:] = [column]
 
-		if self.first_move and env.topPosition[3] >= 0:
-			move_dict['move'] = 3
-			self.first_move = False
-			return
-			
-		best_move = 3
-		max_depth = 4
-		time_per_depth = 0.4
-
-		while time.time() - start_time < 2.5:
-			time_remaining = 2.5 - (time.time() - start_time)
-			max_possible_depth = max_depth + int(time_remaining // time_per_depth)
-
-			for depth in range(max_depth, max_possible_depth + 1):
-				result = self.alpha_beta(env, max_depth, -float('inf'), float('inf'), True, start_time)
-				if result[1] is not None:
-					best_move = result[1]
-					self.killer_moves[max_depth] = best_move
+	def MAX(self, env, depth, a, b):
+		if env.gameOver():
+			return -math.inf
+		if depth == 0:
+			return evaluateFunction(env.board)
 		
-			max_depth = max_possible_depth + 1
-		move_dict['move'] = best_move
+		possible = env.topPosition >= 0
+		indices = []
+		for i, p in enumerate(possible):
+			if p: indices.append(i)
+		value = -math.inf
+
+		for move in indices:
+			envCopy = deepcopy(env)
+			self.simulateMove(env, move, self.position)
+			value = max(value, self.MIN(envCopy, depth-1, a, b))
+
+		if value >= b:
+			return value
+		
+		a = max(a, value)
+
+		return value
 	
-	def alpha_beta(self, env: connect4, depth: int, alpha: float, beta: float, maximizing_player: bool, start_time: float):
-		if time.time() - start_time > 2.9:
-			return self.evaluate_board(env.board), None
+	def MIN(self, env, depth, a, b):
+		if env.gameOver():
+			return math.inf
+		if depth == 0:
+			return evaluateFunction(env.board)
 		
-		if np.all(env.topPosition < 0) or depth == 0:
-			return self.evaluate_board(env.board), None
+		possible = env.topPosition >= 0
+		indices = []
+		for i, p in enumerate(possible):
+			if p: indices.append(i)
+		value = math.inf
+
+		for move in indices:
+			envCopy = deepcopy(env)
+			self.simulateMove(env, move, self.position)
+			value = min(value, self.MAX(envCopy, depth-1, a, b))
+
+		if value <= a:
+			return value
 		
-		possible_moves = self.order_moves(env, depth)
+		b = min(b, value)
 
-		if maximizing_player:
-			max_eval = -float('inf')
-			best_move = possible_moves[0]
-			for move in possible_moves:
-				if env.topPosition[move] < 0:
-					continue
+		return value
 
-				# Simulate the move
-				new_env = self.simulate_move(env, move, self.position)
 
-				# Check if move is winner
-				new_env.gameOver(move, self.position)
-				if new_env.is_winner:
-					eval = 10000
-				else:
-					# Recursively call alpha_beta for the opponent
-					eval = self.alpha_beta(new_env, depth - 1, alpha, beta, False, start_time)[0]
-
-				# Update the best move
-				if eval > max_eval:
-					max_eval = eval
-					best_move = move
-				# Update alpha
-				alpha = max(alpha, eval)
-
-				# Prune the branch if beta <= alpha
-				if beta <= alpha:
-						break
-			return max_eval, best_move
-		else:
-			min_eval = float('inf')
-			best_move = None
-			for move in possible_moves:
-				# Simulate the move
-				new_env = self.simulate_move(env, move, 3-self.position)
-
-				new_env.gameOver(move, 3-self.position)
-				if new_env.is_winner:
-					eval = -10000
-				else:
-					# Recursively call alpha_beta for the player
-					eval = self.alpha_beta(new_env, depth - 1, alpha, beta, True, start_time)[0]
-
-				# Update the best move
-				if eval < min_eval:
-					min_eval = eval
-					best_move = move
-				# Update beta
-				beta = min(beta, eval)
-
-				# Prune the branch if beta <= alpha
-				if beta <= alpha:
-						break
-			return min_eval, best_move
-
-	def evaluate_board(self, board):
-			score = 0
-			rows, cols = 6, 7
-
-			# Reward pieces in strong positions
-			for r in range(rows):
-				for c in range(cols):
-					if board[r][c] == self.position:
-						score += self.weights[r][c]  # Reward strong positions
-					elif board[r][c] == (3 - self.position):
-						score -= self.weights[r][c]  # Penalize opponent's strong positions
-
-			# Evaluate all windows (horizontal, vertical, diagonal)
-			for r in range(rows):
-				for c in range(cols - 3):
-					window = list(board[r, c:c+4])
-					score += self.evaluate_window(window)
-			
-			for r in range(rows - 3):
-				for c in range(cols):
-					window = list(board[r:r+4, c])
-					score += self.evaluate_window(window)
-
-			for r in range(rows - 3):
-				for c in range(cols - 3):
-					window = [board[r+i][c+i] for i in range(4)]
-					score += self.evaluate_window(window)
-
-			for r in range(3, rows):
-				for c in range(cols - 3):
-					window = [board[r-i][c+i] for i in range(4)]
-					score += self.evaluate_window(window)
-
-			return score
-
+	def simulateMove(self, env: connect4, move: int, player: int):
+		env.board[move][move] = player
+		env.topPosition[move] -= 1
+		env.history[0].append(move)
 	
-	def order_moves(self, env, depth=0):
-		possible_moves = [col for col in range(7) if env.topPosition[col] >= 0]
-		ordered_moves = sorted(possible_moves, key=lambda x: self.weights[env.topPosition[x]][x], reverse=True)
-		return ordered_moves
-
-	def simulate_move(self, env, move, player):
-		new_env = deepcopy(env)
-		row = new_env.topPosition[move]
-		new_env.board[row][move] = player
-		new_env.topPosition[move] -= 1
-		return new_env
 	
-	def terminal(self, env):
-		for col in range(env.shape[1]):
-			if env.gameOver(col, self.position):
-				return 10000 if env.is_winner else -10000
+	board = [
+		[0, 0, 0, 0, 0, 0, 0],
+		[0, 0, 0, 0, 0, 0, 0],
+		[0, 0, 0, 0, 0, 0, 0],
+		[0, 0, 0, 0, 0, 0, 0],
+		[0, 0, 0, 0, 0, 0, 0],
+		[0, 0, 0, 0, 0, 0, 0],
+	]
+	def evaluateFunction(board):
+			pass
+	
 		
-		if np.all(env.topPosition < 0):
-			return 0
-
-		return None
-
-	def evaluate_window(self, window):
-			opponent = 3 - self.position
-			player_count = window.count(self.position)
-			opponent_count = window.count(opponent)
-
-			# Immediate win/loss
-			if player_count == 4: return 100000
-			if opponent_count == 4: return -100000
-
-			# Player threats
-			if opponent_count == 0:
-				if player_count == 3: return 1000
-				if player_count == 2: return 50
-
-			# Opponent threats
-			if player_count == 0:
-				if opponent_count == 3: return -1000
-				if opponent_count == 2: return -50
-			
-			return 0
 
 	
 
