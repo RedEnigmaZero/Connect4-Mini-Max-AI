@@ -199,82 +199,124 @@ class alphaBetaAI(connect4Player):
 	This is where you will design a connect4Player that 
 	implements the minimiax algorithm WITH alpha-beta pruning
 	'''
+	def __init__(self, position, seed=0, CVDMode=False):
+			super().__init__(position, seed, CVDMode)
+			# Positional weight matrix (higher values = better positions)
+			self.firstMove = True
+			self.lastMove = None
+			self.positional_weights = [
+				[1,  2,  3,  4,  3, 2, 1],
+				[2,  4,  6,  8,  6, 4, 2],
+				[3,  6,  9, 12,  9, 6, 3],
+				[3,  6,  9, 12,  9, 6, 3],
+				[2,  4,  6,  8,  6, 4, 2],
+				[1,  2,  3,  4,  3, 2, 1]
+			]
 
 	def play(self, env: connect4, move_dict: dict) -> None:
-		maxDepth = 2
-		self.MAX(env, maxDepth)
-		#move[:] = [column]
+		if self.firstMove and env.topPosition[3] == 5:
+			move_dict['move'] = 3
+			self.lastMove = 3
+			self.firstMove = False
+			return
+		elif self.firstMove and self.position == 2:
+			move_dict['move'] = 4
+			self.lastMove = 4
+			self.firstMove = False
+			return
+			
 
-	def MAX(self, env, depth, a, b):
-		if env.gameOver():
-			return -math.inf
-		if depth == 0:
-			return evaluateFunction(env.board)
+		maxDepth = 4
+		best_value, best_move = self.MAX(env, maxDepth, -math.inf, math.inf, self.lastMove)
+		self.lastMove = best_move
+		move_dict['move'] = best_move
+
 		
-		possible = vaildMoves(env)
+
+	def MAX(self, env, depth, a, b, lastMove):
+		if env.topPosition[lastMove] + 1 >= env.shape[0]:
+			pass
+		else:
+			if env.gameOver(lastMove, self.position):
+				return -math.inf, None
+		if depth == 0:
+			return self.evaluateFunction(env.board), None
+		
+		possible = self.vaildMoves(env)
 
 		value = -math.inf
+		bestMove = possible[0] if possible else None
 
 		for move in possible:
 			envCopy = deepcopy(env)
-			self.simulateMove(env, move, self.position)
-			value = max(value, self.MIN(envCopy, depth-1, a, b))
+			self.simulateMove(envCopy, move, self.position)
+			eval, _ = self.MIN(envCopy, depth-1, a, b, move)
+			value = max(value, eval)
+			
 
-		if value >= b:
-			return value
+			if value >= b:
+				bestMove = move
+				return value, bestMove
 		
-		a = max(a, value)
+			a = max(a, value)
 
-		return value
+		return value, bestMove
 	
-	def MIN(self, env, depth, a, b):
-		if env.gameOver():
-			return math.inf
+	def MIN(self, env, depth, a, b, lastMove):
+		if env.topPosition[lastMove] + 1 >= env.shape[0]:
+			pass
+		else:
+			if env.gameOver(lastMove, 3-self.position):
+				return math.inf, None
 		if depth == 0:
-			return evaluateFunction(env.board)
+			return self.evaluateFunction(env.board), None
 		
-		possible = vaildMoves(env)
+		possible = self.vaildMoves(env)
 
 		value = math.inf
+		bestMove = possible[0] if possible else None
 
 		for move in possible:
 			envCopy = deepcopy(env)
-			self.simulateMove(env, move, self.position)
-			value = min(value, self.MAX(envCopy, depth-1, a, b))
+			self.simulateMove(env, move, 3-self.position)
+			eval, _ = self.MAX(envCopy, depth-1, a, b, move)
+			value = min(value, eval)
+			
 
-		if value <= a:
-			return value
+			if value <= a:
+				bestMove = move
+				return value, bestMove
 		
-		b = min(b, value)
+			b = min(b, value)
 
-		return value
+
+
+		return value, bestMove
 
 	def vaildMoves(self, env):
 		possible = env.topPosition >= 0
 		indices = []
 		for i, p in enumerate(possible):
 			if p: indices.append(i)
-		indices.sort(reverse = True)
+		#indices.sort(reverse= maxi)
 		return indices
 
 
 	def simulateMove(self, env: connect4, move: int, player: int):
-		env.board[move][move] = player
+		env.board[env.topPosition[move]][move] = player
 		env.topPosition[move] -= 1
 		env.history[0].append(move)
+		self.last_move = move
 	
-	
-	board = [
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0],
-	]
-	def evaluateFunction(board):
-			pass
-	
+	def evaluateFunction(self, board):
+		score = 0
+		for r in range(6):
+			for c in range(7):
+				if board[r][c] == self.position:
+					score += self.positional_weights[r][c]
+				elif board[r][c] == 3 - self.position:
+					score -= self.positional_weights[r][c]
+		return score
 		
 
 	
