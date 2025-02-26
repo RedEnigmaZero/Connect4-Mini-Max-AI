@@ -199,46 +199,48 @@ class alphaBetaAI(connect4Player):
 	This is where you will design a connect4Player that 
 	implements the minimiax algorithm WITH alpha-beta pruning
 	'''
-<<<<<<< Updated upstream
-
-	def play(self, env: connect4, move_dict: dict) -> None:
-		maxDepth = 2
-		self.MAX(env, maxDepth)
-		#move[:] = [column]
-
-	def MAX(self, env, depth, a, b):
-		if env.gameOver():
-			return -math.inf
-		if depth == 0:
-			return evaluateFunction(env.board)
-=======
 	def __init__(self, position, seed=0, CVDMode=False):
 			super().__init__(position, seed, CVDMode)
 			# Positional weight matrix (higher values = better positions)
 			self.firstMove = True
 			self.lastMove = None
-			self.positional_weights = [
-				[1, 2, 3, 4, 3, 2, 1],
-				[2, 4, 6, 15, 6, 4, 2],
-				[3, 6, 15, 15, 15, 6, 3],
-				[3, 6, 15, 15, 15, 6, 3],
-				[2, 4, 6, 15, 6, 4, 2],
-				[1, 2, 3, 4, 3, 2, 1]
-			]
+			self.all_lines = self.generate_all_lines()
+			self.centrality_order = [3, 2, 4, 1, 5, 0, 6]
+	
+	def generate_all_lines(self):
+			'''Generate all possible lines for 4-in-a-row checks.'''
+			lines = []
+			# Horizontal lines
+			for row in range(6):
+				for col in range(4):
+					lines.append([(row, col + i) for i in range(4)])
+			# Vertical lines
+			for col in range(7):
+				for row in range(3):
+					lines.append([(row + i, col) for i in range(4)])
+			# Diagonal down (top-left to bottom-right)
+			for row in range(3):
+				for col in range(4):
+					lines.append([(row + i, col + i) for i in range(4)])
+			# Diagonal up (bottom-left to top-right)
+			for row in range(3, 6):
+				for col in range(4):
+					lines.append([(row - i, col + i) for i in range(4)])
+			return lines
 
 	def play(self, env: connect4, move_dict: dict) -> None:
 		env = deepcopy(env)
 		if self.firstMove and env.topPosition[3] == 5:
 			move_dict['move'] = 3
-			self.lastMove = 3
+			env.history[1].append(3)
 			self.firstMove = False
 			return
 		elif self.firstMove and self.position == 2:
 			move_dict['move'] = 4
-			self.lastMove = 4
+			env.history[1].append(4)
 			self.firstMove = False
 			return
-			
+
 
 		maxDepth = 4
 		best_value, best_move = self.MAX(deepcopy(env), maxDepth, -math.inf, math.inf, self.lastMove)
@@ -248,35 +250,25 @@ class alphaBetaAI(connect4Player):
 		
 
 	def MAX(self, env, depth, a, b, lastMove):
-		if env.topPosition[lastMove] + 1 >= env.shape[0]:
-			pass
-		else:
-			if env.gameOver(lastMove, 3-self.position):
+		if env.gameOver(env.history[1][-1], 3-self.position):
 				#print("MAX: Termnal")
 				return -math.inf, lastMove
 			
 		if depth == 0:
 			return self.evaluateFunction(env.board), lastMove
->>>>>>> Stashed changes
 		
-		possible = vaildMoves(env)
+		possible = self.vaildMoves(env)
 
 		value = -math.inf
-
+		bestMove = possible[0] if possible else None
 		for move in possible:
 			envCopy = deepcopy(env)
-<<<<<<< Updated upstream
-			self.simulateMove(env, move, self.position)
-			value = max(value, self.MIN(envCopy, depth-1, a, b))
-
-		if value >= b:
-			return value
-=======
 			self.simulateMove(envCopy, move, self.position)
 
 			if envCopy.gameOver(move, self.position):
 				#print("MAX: inf")
 				return math.inf, move
+
 				
 			eval, _ = self.MIN(envCopy, depth-1, a, b, move)
 			
@@ -284,58 +276,35 @@ class alphaBetaAI(connect4Player):
 			if eval > value:
 				value = eval
 				bestMove = move
->>>>>>> Stashed changes
 		
-		a = max(a, value)
+			a = max(a, value)
 
-<<<<<<< Updated upstream
-		return value
-	
-	def MIN(self, env, depth, a, b):
-		if env.gameOver():
-			return math.inf
-		if depth == 0:
-			return evaluateFunction(env.board)
-=======
 			if a >= b:
 				break
 
 		return value, bestMove
 	
 	def MIN(self, env, depth, a, b, lastMove):
-		if env.topPosition[lastMove] + 1 >= env.shape[0]:
-			pass
-		else:
-			if env.gameOver(lastMove, self.position):
+		if env.gameOver(env.history[0][-1], self.position):
 				#print("MIN: Termnal")
 				return math.inf, lastMove
 			
 		if depth == 0:
 			return self.evaluateFunction(env.board), lastMove
->>>>>>> Stashed changes
 		
-		possible = vaildMoves(env)
+		possible = self.vaildMoves(env)
 
 		value = math.inf
+		bestMove = possible[0] if possible else None
 
 		for move in possible:
 			envCopy = deepcopy(env)
-<<<<<<< Updated upstream
-			self.simulateMove(env, move, self.position)
-			value = min(value, self.MAX(envCopy, depth-1, a, b))
-
-		if value <= a:
-			return value
-		
-		b = min(b, value)
-
-		return value
-=======
 			self.simulateMove(envCopy, move, 3-self.position)
 
 			if envCopy.gameOver(move, 3-self.position):
 				#print("MIN: -inf")
 				return -math.inf, move
+
 			
 			eval, _ = self.MAX(envCopy, depth-1, a, b, move)
 			
@@ -350,57 +319,62 @@ class alphaBetaAI(connect4Player):
 				break
 
 		return value, bestMove
->>>>>>> Stashed changes
 
 	def vaildMoves(self, env):
 		possible = env.topPosition >= 0
 		indices = []
 		for i, p in enumerate(possible):
 			if p: indices.append(i)
-<<<<<<< Updated upstream
-		indices.sort(reverse = True)
-=======
-		maxi = True if self.position == 1 else False
-		indices.sort(reverse= maxi)
->>>>>>> Stashed changes
+		indices.sort(key=lambda x: self.centrality_order.index(x))
 		return indices
 
 
 	def simulateMove(self, env: connect4, move: int, player: int):
-		env.board[move][move] = player
+		env.board[env.topPosition[move]][move] = player
 		env.topPosition[move] -= 1
-		env.history[0].append(move)
-<<<<<<< Updated upstream
-	
-	
-	board = [
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0],
-		[0, 0, 0, 0, 0, 0, 0],
-	]
-	def evaluateFunction(board):
-			pass
-	
+		env.history[player - 1].append(move) 
 		
-=======
 
 	
 	def evaluateFunction(self, board):
-		positional_matrix = self.create_positional_matrix(board)
-		score_matrix = self.positional_weights * positional_matrix  
-		return np.sum(score_matrix)
+			current_player = self.position
+			opponent = 3 - current_player
+			current_count = 0
+			opponent_count = 0
 
-	def create_positional_matrix(self, board):
-		positional_matrix = np.zeros_like(board)  # Initialize with zeros
-		positional_matrix[board == self.position] = 1    # Current player's positions
-		positional_matrix[board == (3 - self.position)] = -1  # Opponent's positions
-		return positional_matrix
-			
->>>>>>> Stashed changes
+			for line in self.all_lines:
+				cp_possible = True  # Current player possible
+				op_possible = True  # Opponent possible
 
+				for (r, c) in line:
+					cell = board[r][c]
+					if cell == opponent:
+						cp_possible = False
+					if cell == current_player:
+						op_possible = False
+					if not cp_possible and not op_possible:
+						break  # Early exit
+
+				if cp_possible:
+					current_count += 1
+				if op_possible:
+					opponent_count += 1
+
+			# Check for immediate wins
+			if self.has_winning_line(board, current_player):
+				return math.inf
+			if self.has_winning_line(board, opponent):
+				return -math.inf
+
+			return current_count - opponent_count
+
+	def has_winning_line(self, board, player):
+		'''Check if player has any complete 4-in-a-row.'''
+		for line in self.all_lines:
+			win = all(board[r][c] == player for (r, c) in line)
+			if win:
+				return True
+		return False
 	
 
 # Defining Constants
