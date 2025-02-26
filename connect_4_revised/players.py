@@ -199,6 +199,7 @@ class alphaBetaAI(connect4Player):
 	This is where you will design a connect4Player that 
 	implements the minimiax algorithm WITH alpha-beta pruning
 	'''
+<<<<<<< Updated upstream
 
 	def play(self, env: connect4, move_dict: dict) -> None:
 		maxDepth = 2
@@ -210,6 +211,53 @@ class alphaBetaAI(connect4Player):
 			return -math.inf
 		if depth == 0:
 			return evaluateFunction(env.board)
+=======
+	def __init__(self, position, seed=0, CVDMode=False):
+			super().__init__(position, seed, CVDMode)
+			# Positional weight matrix (higher values = better positions)
+			self.firstMove = True
+			self.lastMove = None
+			self.positional_weights = [
+				[1, 2, 3, 4, 3, 2, 1],
+				[2, 4, 6, 15, 6, 4, 2],
+				[3, 6, 15, 15, 15, 6, 3],
+				[3, 6, 15, 15, 15, 6, 3],
+				[2, 4, 6, 15, 6, 4, 2],
+				[1, 2, 3, 4, 3, 2, 1]
+			]
+
+	def play(self, env: connect4, move_dict: dict) -> None:
+		env = deepcopy(env)
+		if self.firstMove and env.topPosition[3] == 5:
+			move_dict['move'] = 3
+			self.lastMove = 3
+			self.firstMove = False
+			return
+		elif self.firstMove and self.position == 2:
+			move_dict['move'] = 4
+			self.lastMove = 4
+			self.firstMove = False
+			return
+			
+
+		maxDepth = 4
+		best_value, best_move = self.MAX(deepcopy(env), maxDepth, -math.inf, math.inf, self.lastMove)
+		self.lastMove = best_move
+		move_dict['move'] = best_move
+
+		
+
+	def MAX(self, env, depth, a, b, lastMove):
+		if env.topPosition[lastMove] + 1 >= env.shape[0]:
+			pass
+		else:
+			if env.gameOver(lastMove, 3-self.position):
+				#print("MAX: Termnal")
+				return -math.inf, lastMove
+			
+		if depth == 0:
+			return self.evaluateFunction(env.board), lastMove
+>>>>>>> Stashed changes
 		
 		possible = vaildMoves(env)
 
@@ -217,14 +265,30 @@ class alphaBetaAI(connect4Player):
 
 		for move in possible:
 			envCopy = deepcopy(env)
+<<<<<<< Updated upstream
 			self.simulateMove(env, move, self.position)
 			value = max(value, self.MIN(envCopy, depth-1, a, b))
 
 		if value >= b:
 			return value
+=======
+			self.simulateMove(envCopy, move, self.position)
+
+			if envCopy.gameOver(move, self.position):
+				#print("MAX: inf")
+				return math.inf, move
+				
+			eval, _ = self.MIN(envCopy, depth-1, a, b, move)
+			
+
+			if eval > value:
+				value = eval
+				bestMove = move
+>>>>>>> Stashed changes
 		
 		a = max(a, value)
 
+<<<<<<< Updated upstream
 		return value
 	
 	def MIN(self, env, depth, a, b):
@@ -232,6 +296,23 @@ class alphaBetaAI(connect4Player):
 			return math.inf
 		if depth == 0:
 			return evaluateFunction(env.board)
+=======
+			if a >= b:
+				break
+
+		return value, bestMove
+	
+	def MIN(self, env, depth, a, b, lastMove):
+		if env.topPosition[lastMove] + 1 >= env.shape[0]:
+			pass
+		else:
+			if env.gameOver(lastMove, self.position):
+				#print("MIN: Termnal")
+				return math.inf, lastMove
+			
+		if depth == 0:
+			return self.evaluateFunction(env.board), lastMove
+>>>>>>> Stashed changes
 		
 		possible = vaildMoves(env)
 
@@ -239,6 +320,7 @@ class alphaBetaAI(connect4Player):
 
 		for move in possible:
 			envCopy = deepcopy(env)
+<<<<<<< Updated upstream
 			self.simulateMove(env, move, self.position)
 			value = min(value, self.MAX(envCopy, depth-1, a, b))
 
@@ -248,13 +330,39 @@ class alphaBetaAI(connect4Player):
 		b = min(b, value)
 
 		return value
+=======
+			self.simulateMove(envCopy, move, 3-self.position)
+
+			if envCopy.gameOver(move, 3-self.position):
+				#print("MIN: -inf")
+				return -math.inf, move
+			
+			eval, _ = self.MAX(envCopy, depth-1, a, b, move)
+			
+
+			if eval < value:
+				value = eval
+				bestMove = move
+
+			b = min(b, value)
+
+			if b <= a:
+				break
+
+		return value, bestMove
+>>>>>>> Stashed changes
 
 	def vaildMoves(self, env):
 		possible = env.topPosition >= 0
 		indices = []
 		for i, p in enumerate(possible):
 			if p: indices.append(i)
+<<<<<<< Updated upstream
 		indices.sort(reverse = True)
+=======
+		maxi = True if self.position == 1 else False
+		indices.sort(reverse= maxi)
+>>>>>>> Stashed changes
 		return indices
 
 
@@ -262,6 +370,7 @@ class alphaBetaAI(connect4Player):
 		env.board[move][move] = player
 		env.topPosition[move] -= 1
 		env.history[0].append(move)
+<<<<<<< Updated upstream
 	
 	
 	board = [
@@ -276,6 +385,21 @@ class alphaBetaAI(connect4Player):
 			pass
 	
 		
+=======
+
+	
+	def evaluateFunction(self, board):
+		positional_matrix = self.create_positional_matrix(board)
+		score_matrix = self.positional_weights * positional_matrix  
+		return np.sum(score_matrix)
+
+	def create_positional_matrix(self, board):
+		positional_matrix = np.zeros_like(board)  # Initialize with zeros
+		positional_matrix[board == self.position] = 1    # Current player's positions
+		positional_matrix[board == (3 - self.position)] = -1  # Opponent's positions
+		return positional_matrix
+			
+>>>>>>> Stashed changes
 
 	
 
